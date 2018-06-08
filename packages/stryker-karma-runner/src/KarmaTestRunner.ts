@@ -7,6 +7,12 @@ import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from './TestHooksMiddleware
 import { touchSync } from './utils';
 import { setGlobalLogLevel } from 'log4js';
 import KarmaConfigReader from './KarmaConfigReader';
+import KarmaConfigHolder from './KarmaConfigHolder';
+import StrykerReporter from './StrykerReporter';
+let cli = require('@angular/cli/lib/cli');
+if ('default' in cli) {
+  cli = cli.default;
+}
 
 export interface ConfigOptions extends karma.ConfigOptions {
   coverageReporter?: { type: string, dir?: string, subdir?: string };
@@ -49,187 +55,103 @@ function defaultOptions(): Readonly<ConfigOptions> {
 export default class KarmaTestRunner implements TestRunner {
 
   private log = log4js.getLogger(KarmaTestRunner.name);
-  private server: karma.Server;
-  private serverStartedPromise: Promise<void>;
+  // private server: karma.Server;
+  // private serverStartedPromise: Promise<void>;
   private currentTestResults: TestResult[];
   private currentErrorMessages: string[];
   private currentCoverageReport?: CoverageCollection | CoveragePerTestResult;
-  private currentRunResult: karma.TestResults;
-  private readonly testHooksMiddleware = new TestHooksMiddleware();
+  private currentRunStatus: RunStatus;
+  private readonly testHooksMiddleware = TestHooksMiddleware.instance;
 
   constructor(private options: RunnerOptions) {
     setGlobalLogLevel(options.strykerOptions.logLevel || 'info');
-    let karmaConfig = this.readConfig(options);
-    karmaConfig = this.configureTestRunner(karmaConfig);
-    karmaConfig = this.configureCoverageIfEnabled(karmaConfig);
-    karmaConfig = this.configureProperties(karmaConfig);
-    karmaConfig = this.configureTestHooksMiddleware(karmaConfig);
+    KarmaConfigHolder.karmaConfig = options.strykerOptions[KARMA_CONFIG];
+    KarmaConfigHolder.karmaConfigFile = options.strykerOptions[KARMA_CONFIG_FILE];
+    KarmaConfigHolder.port = options.port;
+    // let karmaConfig = this.readConfig(options);
+    // karmaConfig = this.configureTestRunner(karmaConfig);
+    // karmaConfig = this.configureCoverageIfEnabled(karmaConfig);
+    // karmaConfig = this.configureProperties(karmaConfig);
+    // karmaConfig = this.configureTestHooksMiddleware(karmaConfig);
 
-    this.log.debug(`using config ${JSON.stringify(karmaConfig, null, 2)}`);
-    this.server = new karma.Server(karmaConfig, function (exitCode) {
-      process.exit(exitCode);
-    });
-
-    this.listenToBrowserStarted();
+    // this.log.debug(`using config ${JSON.stringify(karmaConfig, null, 2)}`);
+    // this.server = new karma.Server(karmaConfig, function (exitCode) {
+    //   process.exit(exitCode);
+    // });
+    this.resetRun() 
     this.listenToRunComplete();
     this.listenToSpecComplete();
     this.listenToCoverage();
     this.listenToBrowserError();
 
-    this.server.start();
+    // this.server.start();
   }
 
-  private readConfig(options: RunnerOptions): ConfigOptions {
-    return Object.assign({}, new KarmaConfigReader(options.strykerOptions[KARMA_CONFIG_FILE]).read(), options.strykerOptions[KARMA_CONFIG]);
-  }
+  // private readConfig(options: RunnerOptions): ConfigOptions {
+  //   return Object.assign({}, new KarmaConfigReader(options.strykerOptions[KARMA_CONFIG_FILE]).read(), options.strykerOptions[KARMA_CONFIG]);
+  // }
 
   init(): Promise<void> {
-    return this.serverStartedPromise;
+    return new Promise((res, rej) => {
+      StrykerReporter.instance.on('browsers_ready', res);
+      cli({
+        cliArgs: ['test', `--karma-config=${require.resolve('./stryker-karma.conf')}`],
+        inputStream: process.stdin,
+        outputStream: process.stdout
+      }).then(() => {
+        console.log('cli done');
+      }).catch(rej);
+    });
+  }
+
+  resetRun() {
+    this.currentTestResults = [];
+    this.currentErrorMessages = [];
+    this.currentCoverageReport = undefined;
+    this.currentRunStatus = RunStatus.Complete;
   }
 
   run({ testHooks }: { testHooks?: string }): Promise<RunResult> {
     this.testHooksMiddleware.currentTestHooks = testHooks || '';
-    this.currentTestResults = [];
-    this.currentErrorMessages = [];
-    this.currentCoverageReport = undefined;
-    this.currentRunResult = {
-      disconnected: false,
-      error: false,
-      exitCode: 0,
-      failed: 0,
-      success: 0
-    };
+    this.resetRun();
     return this.runServer().then(() => this.collectRunResult());
   }
 
   // Don't use dispose() to stop karma (using karma.stopper.stop)
   // It only works when in `detached` mode, as specified here: http://karma-runner.github.io/1.0/config/configuration-file.html
 
-  private listenToBrowserStarted() {
-    this.serverStartedPromise = new Promise<void>((res) => this.server.on('browsers_ready', res));
-  }
+  // private listenToBrowserStarted() {
+  //   this.serverStartedPromise = new Promise<void>((res) => this.server.on('browsers_ready', res));
+  // }
 
   private listenToSpecComplete() {
-    this.server.on('spec_complete', (browser: any, spec: KarmaSpec) => {
-      const name = `${spec.suite.join(' ')} ${spec.description}`;
-      let status = TestStatus.Failed;
-      if (spec.skipped) {
-        status = TestStatus.Skipped;
-      } else if (spec.success) {
-        status = TestStatus.Success;
-      }
-      this.currentTestResults.push({
-        name,
-        status,
-        timeSpentMs: spec.time,
-        failureMessages: spec.log
-      });
+    StrykerReporter.instance.on('test_result', (testResult: TestResult) => {
+      this.currentTestResults.push(testResult);
     });
   }
 
   private listenToCoverage() {
-    this.server.on('raw_coverage_complete', (coverageReport: CoverageCollection | CoveragePerTestResult) => {
+    StrykerReporter.instance.on('coverage_report', (coverageReport: CoverageCollection | CoveragePerTestResult) => {
       this.currentCoverageReport = coverageReport;
     });
   }
 
   private listenToRunComplete() {
-    this.server.on('run_complete', (browsers, runResult) => {
-      this.currentRunResult = runResult;
+    StrykerReporter.instance.on('run_complete', (runStatus: RunStatus) => {
+      this.currentRunStatus = runStatus;
     });
   }
 
   private listenToBrowserError() {
-    this.server.on('browser_error', (browser: any, error: any) => {
-      // Karma 2.0 has different error messages
-      if (error.message) {
-        this.currentErrorMessages.push(error.message);
-      } else {
-        this.currentErrorMessages.push(error.toString());
-      }
+    StrykerReporter.instance.on('browser_error', (error: string) => {
+      this.currentErrorMessages.push(error);
     });
-  }
-
-  private configureProperties(karmaConfig: ConfigOptions) {
-    karmaConfig.autoWatch = false;
-    karmaConfig.singleRun = false;
-    return karmaConfig;
-  }
-
-  /**
-   * Configures the test hooks middleware. 
-   * It adds a non-existing file to the top `files` array. 
-   * Further more it configures a middleware that serves the file.
-   */
-  private configureTestHooksMiddleware(karmaConfig: ConfigOptions): ConfigOptions {
-    // Add test run middleware file
-    karmaConfig.files = karmaConfig.files || [];
-    karmaConfig.files.unshift({ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: false, nocache: true }); // Add a custom hooks file to provide hooks
-    const middleware: string[] = (karmaConfig as any).middleware || ((karmaConfig as any).middleware = []);
-    middleware.unshift(TestHooksMiddleware.name);
-    this.addPlugin(karmaConfig, { [`middleware:${TestHooksMiddleware.name}`]: ['value', this.testHooksMiddleware.handler()] });
-    touchSync(TEST_HOOKS_FILE_NAME); // Make sure it exists so karma doesn't log a warning
-    return karmaConfig;
-  }
-
-  /**
-   * Adds the plugin to given karma configuration with respect to the karma default
-   * @param karmaConfig The karma configuration
-   * @param karmaPlugin The karma plugin to add
-   */
-  private addPlugin(karmaConfig: ConfigOptions, karmaPlugin: any) {
-    karmaConfig.plugins = karmaConfig.plugins || ['karma-*'];
-    karmaConfig.plugins.push(karmaPlugin);
-  }
-
-  private configureCoverageIfEnabled(karmaConfig: ConfigOptions) {
-    if (this.options.strykerOptions.coverageAnalysis !== 'off') {
-      this.configureCoverageReporters(karmaConfig);
-      this.addPlugin(karmaConfig, rawCoverageReporter);
-    }
-    return karmaConfig;
-  }
-
-  private configureCoverageReporters(karmaConfig: ConfigOptions) {
-    if (!karmaConfig.reporters) {
-      karmaConfig.reporters = [];
-    }
-    karmaConfig.reporters.push('rawCoverage');
-  }
-
-  private configureTestRunner(overrides: ConfigOptions) {
-    // Merge defaults with given
-    let karmaConfig = Object.assign<ConfigOptions, ConfigOptions, ConfigOptions>({}, defaultOptions(), overrides);
-
-    // Override port
-    karmaConfig.port = this.options.port;
-
-    this.forceOptions(karmaConfig);
-
-    // Override frameworks
-    if (this.options.strykerOptions.testFramework && !(overrides && overrides.frameworks)) {
-      karmaConfig.frameworks = [this.options.strykerOptions.testFramework];
-    }
-
-    return karmaConfig;
-  }
-
-  /**
-   * Some options cannot be configured by the user (like timeout, reporter, etc).
-   * This method forces that options on given karma config.
-   * @param karmaConfig The karma config on which options need to be forced
-   */
-  private forceOptions(karmaConfig: ConfigOptions) {
-    let i: keyof ConfigOptions;
-    for (i in FORCED_OPTIONS) {
-      karmaConfig[i] = FORCED_OPTIONS[i];
-    }
   }
 
   private runServer() {
     return new Promise<void>(resolve => {
       karma.runner.run({ port: this.options.port }, (exitCode) => {
-        this.log.info('karma run done with ', exitCode);
+        this.log.debug('karma run done with ', exitCode);
         resolve();
       });
     });
@@ -238,19 +160,18 @@ export default class KarmaTestRunner implements TestRunner {
   private collectRunResult(): RunResult {
     return {
       tests: this.currentTestResults,
-      status: this.collectRunState(),
+      status: this.determineRunState(),
       coverage: this.currentCoverageReport,
       errorMessages: this.currentErrorMessages
     };
   }
 
-  private collectRunState(): RunStatus {
-    if (this.currentRunResult.disconnected) {
-      return RunStatus.Timeout;
-    } else if (this.currentRunResult.error && this.currentErrorMessages.length > 0) {
-      return RunStatus.Error;
-    } else {
+  private determineRunState() {
+    if (this.currentRunStatus === RunStatus.Error && !this.currentErrorMessages.length) {
       return RunStatus.Complete;
+    }
+    else {
+      return this.currentRunStatus;
     }
   }
 }
