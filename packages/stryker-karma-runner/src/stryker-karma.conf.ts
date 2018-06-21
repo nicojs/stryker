@@ -1,12 +1,9 @@
 import { Config, ConfigOptions } from 'karma';
 import * as path from 'path';
-import KarmaConfigHolder from './KarmaConfigHolder';
-import { requireModule, touchSync } from './utils';
+import { requireModule } from './utils';
 import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from './TestHooksMiddleware';
 import StrykerReporter from './StrykerReporter';
-import { getLogger } from 'log4js';
-
-const log = getLogger('stryker-karma.conf');
+import { getLogger, Logger } from 'log4js';
 
 function setDefaultOptions(config: Config) {
   config.set({
@@ -15,21 +12,29 @@ function setDefaultOptions(config: Config) {
   });
 }
 
-function setUserKarmaConfigFile(config: Config) {
-  if (KarmaConfigHolder.karmaConfigFile && typeof KarmaConfigHolder.karmaConfigFile === 'string') {
-    const configFileName = path.resolve(KarmaConfigHolder.karmaConfigFile);
+function setUserKarmaConfigFile(config: Config, log: Logger) {
+  if (globalSettings.karmaConfigFile && typeof globalSettings.karmaConfigFile === 'string') {
+    const configFileName = path.resolve(globalSettings.karmaConfigFile);
     log.info('Importing config from "%s"', configFileName);
     try {
       const userConfig = requireModule(configFileName);
       userConfig(config);
-      config.configFile = configFileName; // override config file so base path is resolved from correct dir.
+      config.configFile = configFileName; // override config to ensure karma is as user-like as possible
+      if (!config.basePath) {
+        // set the base path so karma will not resolve against the location of stryker-karma.conf.js
+        config.basePath = path.resolve(path.dirname(configFileName));
+      }
     } catch (error) {
-      log.error(`Could not read karma configuration from ${KarmaConfigHolder.karmaConfigFile}.`, error);
+      log.error(`Could not read karma configuration from ${globalSettings.karmaConfigFile}.`, error);
     }
   }
 }
 
-function setForcedOptions(config: Config) {
+/**
+ * Sets configuration that is needed to control the karma life cycle. Namely it shouldn't watch files and not quit after first test run.
+ * @param config The config to use
+ */
+function setLifeCycleOptions(config: Config) {
   config.set({
     // Override browserNoActivityTimeout. Default value 10000 might not enough to send perTest coverage results
     browserNoActivityTimeout: 1000000,
@@ -44,13 +49,13 @@ function setForcedOptions(config: Config) {
 
 function setPort(config: Config) {
   config.set({
-    port: KarmaConfigHolder.port
+    port: globalSettings.port
   })
 }
 
 function setUserKarmaConfig(config: Config) {
-  if (KarmaConfigHolder.karmaConfig) {
-    config.set(KarmaConfigHolder.karmaConfig);
+  if (globalSettings.karmaConfig) {
+    config.set(globalSettings.karmaConfig);
   }
 }
 
@@ -68,11 +73,11 @@ function addPlugin(karmaConfig: ConfigOptions, karmaPlugin: any) {
 function configureTestHooksMiddleware(config: Config) {
   // Add test run middleware file
   config.files = config.files || [];
-  
-  config.files.unshift({ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: false, nocache: true }); // Add a custom hooks file to provide hooks
+
+  config.files.unshift({ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: true, nocache: true }); // Add a custom hooks file to provide hooks
   const middleware: string[] = (config as any).middleware || ((config as any).middleware = []);
   middleware.unshift(TestHooksMiddleware.name);
-  addPlugin(config, { [`middleware:${TestHooksMiddleware.name}`]: ['value', TestHooksMiddleware.instance.handler()] });
+  addPlugin(config, { [`middleware:${TestHooksMiddleware.name}`]: ['value', TestHooksMiddleware.instance.handler] });
 }
 
 function configureStrykerReporter(config: Config) {
@@ -83,14 +88,30 @@ function configureStrykerReporter(config: Config) {
   config.reporters.push(StrykerReporter.name);
 }
 
-export = function (config: Config) {
+const globalSettings: {
+  port?: number;
+  karmaConfig?: ConfigOptions;
+  karmaConfigFile?: string;
+} = {};
+
+export = Object.assign((config: Config) => {
+  const log = getLogger(path.basename(__filename));
   setDefaultOptions(config);
-  setUserKarmaConfigFile(config);
-  const basePath = config.basePath;
+  setUserKarmaConfigFile(config, log);
   setUserKarmaConfig(config);
-  setForcedOptions(config);
+  setLifeCycleOptions(config);
   setPort(config);
   configureTestHooksMiddleware(config);
   configureStrykerReporter(config);
-  config.basePath = basePath;
-}
+}, {
+    /**
+     * Provide global settings for next configuration
+     * This is the only way we can pass through any values between the `KarmaTestRunner` and the stryker-karma.conf file.
+     * (not counting environment variables)
+    */
+    setGlobals(globals: { port?: number; karmaConfig?: ConfigOptions; karmaConfigFile?: string; }) {
+      globalSettings.port = globals.port;
+      globalSettings.karmaConfig = globals.karmaConfig;
+      globalSettings.karmaConfigFile = globals.karmaConfigFile;
+    }
+  });

@@ -1,14 +1,12 @@
 import * as log4js from 'log4js';
-import { TestRunner, TestResult, TestStatus, RunStatus, RunResult, RunnerOptions, CoverageCollection, CoveragePerTestResult } from 'stryker-api/test_runner';
+import { TestRunner, TestResult, RunStatus, RunResult, RunnerOptions, CoverageCollection, CoveragePerTestResult } from 'stryker-api/test_runner';
 import * as karma from 'karma';
-import * as rawCoverageReporter from './RawCoverageReporter';
 import { KARMA_CONFIG, KARMA_CONFIG_FILE } from './configKeys';
-import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from './TestHooksMiddleware';
-import { touchSync } from './utils';
+import TestHooksMiddleware from './TestHooksMiddleware';
 import { setGlobalLogLevel } from 'log4js';
-import KarmaConfigReader from './KarmaConfigReader';
-import KarmaConfigHolder from './KarmaConfigHolder';
 import StrykerReporter from './StrykerReporter';
+import strykerKarmaConf = require('./stryker-karma.conf');
+
 let cli = require('@angular/cli/lib/cli');
 if ('default' in cli) {
   cli = cli.default;
@@ -17,39 +15,6 @@ if ('default' in cli) {
 export interface ConfigOptions extends karma.ConfigOptions {
   coverageReporter?: { type: string, dir?: string, subdir?: string };
   detached?: boolean;
-}
-
-interface KarmaSpec {
-  description: string;
-  id: string;
-  skipped: boolean;
-  success: boolean;
-  time: number;
-  suite: string[];
-  log: string[];
-}
-
-const FORCED_OPTIONS = (() => {
-  const config: ConfigOptions = {
-    // Override browserNoActivityTimeout. Default value 10000 might not enough to send perTest coverage results
-    browserNoActivityTimeout: 1000000,
-    // Override base, we don't want to original karma baseDir to be interfering with the stryker setup
-    basePath: '.',
-    // No auto watch, stryker will inform us when we need to test
-    autoWatch: false,
-    // Don't stop after first run
-    singleRun: false,
-    // Never detach, always run in this same process (is already a separate process)
-    detached: false
-  };
-  return Object.freeze(config);
-})();
-
-function defaultOptions(): Readonly<ConfigOptions> {
-  return Object.freeze({
-    browsers: ['PhantomJS'],
-    frameworks: ['jasmine'],
-  });
 }
 
 export default class KarmaTestRunner implements TestRunner {
@@ -65,31 +30,19 @@ export default class KarmaTestRunner implements TestRunner {
 
   constructor(private options: RunnerOptions) {
     setGlobalLogLevel(options.strykerOptions.logLevel || 'info');
-    KarmaConfigHolder.karmaConfig = options.strykerOptions[KARMA_CONFIG];
-    KarmaConfigHolder.karmaConfigFile = options.strykerOptions[KARMA_CONFIG_FILE];
-    KarmaConfigHolder.port = options.port;
-    // let karmaConfig = this.readConfig(options);
-    // karmaConfig = this.configureTestRunner(karmaConfig);
-    // karmaConfig = this.configureCoverageIfEnabled(karmaConfig);
-    // karmaConfig = this.configureProperties(karmaConfig);
-    // karmaConfig = this.configureTestHooksMiddleware(karmaConfig);
 
-    // this.log.debug(`using config ${JSON.stringify(karmaConfig, null, 2)}`);
-    // this.server = new karma.Server(karmaConfig, function (exitCode) {
-    //   process.exit(exitCode);
-    // });
-    this.resetRun() 
+    strykerKarmaConf.setGlobals({
+      port: options.port,
+      karmaConfig: options.strykerOptions[KARMA_CONFIG],
+      karmaConfigFile: options.strykerOptions[KARMA_CONFIG_FILE]
+    });
+
+    this.resetRun()
     this.listenToRunComplete();
     this.listenToSpecComplete();
     this.listenToCoverage();
     this.listenToBrowserError();
-
-    // this.server.start();
   }
-
-  // private readConfig(options: RunnerOptions): ConfigOptions {
-  //   return Object.assign({}, new KarmaConfigReader(options.strykerOptions[KARMA_CONFIG_FILE]).read(), options.strykerOptions[KARMA_CONFIG]);
-  // }
 
   init(): Promise<void> {
     return new Promise((res, rej) => {
@@ -119,10 +72,6 @@ export default class KarmaTestRunner implements TestRunner {
 
   // Don't use dispose() to stop karma (using karma.stopper.stop)
   // It only works when in `detached` mode, as specified here: http://karma-runner.github.io/1.0/config/configuration-file.html
-
-  // private listenToBrowserStarted() {
-  //   this.serverStartedPromise = new Promise<void>((res) => this.server.on('browsers_ready', res));
-  // }
 
   private listenToSpecComplete() {
     StrykerReporter.instance.on('test_result', (testResult: TestResult) => {

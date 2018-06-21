@@ -12,6 +12,10 @@ export interface KarmaSpec {
   log: string[];
 }
 
+/**
+ * This is a singleton implementation of a KarmaReporter.
+ * It is loaded by 
+ */
 export default class StrykerReporter extends EventEmitter {
 
   private constructor() {
@@ -61,9 +65,6 @@ export default class StrykerReporter extends EventEmitter {
   }
 
   onBrowserReady(){
-    this.emit('browsers_ready');
-  }
-  onBrowsersReady(){
     this.emit('browsers_ready');
   }
 
