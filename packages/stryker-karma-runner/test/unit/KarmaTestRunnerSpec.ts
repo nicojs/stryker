@@ -4,16 +4,13 @@ import KarmaTestRunner from '../../src/KarmaTestRunner';
 import { RunnerOptions } from 'stryker-api/test_runner';
 import * as karma from 'karma';
 import * as sinon from 'sinon';
-import * as rawCoverageReporter from '../../src/RawCoverageReporter';
 import { TEST_HOOKS_FILE_NAME } from '../../src/TestHooksMiddleware';
-import KarmaConfigReader, * as karmaConfigReaderModule from '../../src/KarmaConfigReader';
 
 describe('KarmaTestRunner', () => {
 
   let options: RunnerOptions;
   let sut: KarmaTestRunner;
   let sandbox: sinon.SinonSandbox;
-  let karmaConfigReader: sinon.SinonStubbedInstance<KarmaConfigReader>;
 
   beforeEach(() => {
     options = {
@@ -21,45 +18,12 @@ describe('KarmaTestRunner', () => {
       strykerOptions: {},
       fileNames: []
     };
-    karmaConfigReader = sinon.createStubInstance(KarmaConfigReader);
     sandbox = sinon.createSandbox();
-    sandbox.stub(karmaConfigReaderModule, 'default').returns(karmaConfigReader);
     sandbox.stub(karma.stopper, 'stop');
     sandbox.stub(karma, 'Server').returns({ on: sandbox.stub(), start: sandbox.stub() });
   });
 
   describe('when constructed', () => {
-
-    it('should create karmaConfigReader using "karmaConfigFile"', () => {
-      // options.strykerOptions.karmaConfig = karmaConfig;
-      options.strykerOptions['karmaConfigFile'] = 'expectedFile';
-      new KarmaTestRunner(options);
-      expect(karmaConfigReaderModule.default).to.have.been.calledWith('expectedFile');
-      expect(karmaConfigReaderModule.default).to.have.been.calledWithNew;
-      expect(karmaConfigReader.read).called;
-    });
-
-    it('should read karma configuration from karma.conf.js file', () => {
-      const karmaConfig: ConfigOptions = {
-        browsers: ['foobar-browser']
-      };
-      karmaConfigReader.read.returns(karmaConfig);
-      new KarmaTestRunner(options);
-      expect(karma.Server).to.have.been.calledWith(sinon.match({
-        browsers: ['foobar-browser']
-      }));
-    });
-
-    it('should allow a user to override karmaConfig directly from stryker config', () => {
-      karmaConfigReader.read.returns({
-        browsers: ['foobar-browser']
-      });
-      options.strykerOptions['karmaConfig'] = { browsers: ['baz-browser'] };
-      new KarmaTestRunner(options);
-      expect(karma.Server).to.have.been.calledWith(sinon.match({
-        browsers: ['baz-browser']
-      }));
-    });
 
     it('should force some non-overridable options', () => {
       const karmaConfig: ConfigOptions = {
@@ -149,7 +113,7 @@ describe('KarmaTestRunner', () => {
         expect(karma.Server).to.have.been.calledWithMatch(
           sinon.match({
             reporters: ['rawCoverage'],
-            plugins: ['karma-*', rawCoverageReporter, { ['middleware:TestHooksMiddleware']: ['value', sinon.match.func] }],
+            plugins: ['karma-*', { ['middleware:TestHooksMiddleware']: ['value', sinon.match.func] }],
             files: [
               {
                 included: true,
