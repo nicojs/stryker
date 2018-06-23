@@ -16,8 +16,10 @@ export interface KarmaSpec {
  * This is a singleton implementation of a KarmaReporter.
  * It is loaded by 
  */
-export default class StrykerReporter extends EventEmitter {
+export default class StrykerReporter extends EventEmitter implements karma.Reporter {
 
+  adapters: any[] = [];
+  
   private constructor() {
     super();
   }
@@ -31,7 +33,7 @@ export default class StrykerReporter extends EventEmitter {
   }
 
   onSpecComplete(browser: any, spec: KarmaSpec) {
-    const name = `${spec.suite.join(' ')} ${spec.description}`;
+    const name = spec.suite.reduce((name, suite) => name + suite + ' ', '') + spec.description;
     let status = TestStatus.Failed;
     if (spec.skipped) {
       status = TestStatus.Skipped;
@@ -64,7 +66,7 @@ export default class StrykerReporter extends EventEmitter {
     this.emit('coverage_report', result.coverage);
   }
 
-  onBrowserReady(){
+  onBrowsersReady() {
     this.emit('browsers_ready');
   }
 
@@ -75,6 +77,12 @@ export default class StrykerReporter extends EventEmitter {
     } else {
       this.emit('browser_error', error.toString());
     }
+  };
+
+  onCompileError(errors: string[]) {
+    // This is called from angular cli logic
+    // https://github.com/angular/angular-cli/blob/012672161087a05ae5ecffbed5d1ee307ce1e0ad/packages/angular_devkit/build_angular/src/angular-cli-files/plugins/karma.ts#L96
+    this.emit('compile_error', errors);
   };
 
 }

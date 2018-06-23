@@ -20,10 +20,6 @@ function setUserKarmaConfigFile(config: Config, log: Logger) {
       const userConfig = requireModule(configFileName);
       userConfig(config);
       config.configFile = configFileName; // override config to ensure karma is as user-like as possible
-      if (!config.basePath) {
-        // set the base path so karma will not resolve against the location of stryker-karma.conf.js
-        config.basePath = path.resolve(path.dirname(configFileName));
-      }
     } catch (error) {
       log.error(`Could not read karma configuration from ${globalSettings.karmaConfigFile}.`, error);
     }
@@ -59,6 +55,17 @@ function setUserKarmaConfig(config: Config) {
   }
 }
 
+function setBasePath(config: Config) {
+  if (!config.basePath) {
+    // We need to set the base path, so karma won't use this file to base everything of
+    if (globalSettings.karmaConfigFile) {
+      config.basePath = path.resolve(path.dirname(globalSettings.karmaConfigFile));
+    } else {
+      config.basePath = process.cwd();
+    }
+  }
+}
+
 function addPlugin(karmaConfig: ConfigOptions, karmaPlugin: any) {
   karmaConfig.plugins = karmaConfig.plugins || ['karma-*'];
   karmaConfig.plugins.push(karmaPlugin);
@@ -74,7 +81,7 @@ function configureTestHooksMiddleware(config: Config) {
   // Add test run middleware file
   config.files = config.files || [];
 
-  config.files.unshift({ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: true, nocache: true }); // Add a custom hooks file to provide hooks
+  config.files.unshift({ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: false, nocache: true }); // Add a custom hooks file to provide hooks
   const middleware: string[] = (config as any).middleware || ((config as any).middleware = []);
   middleware.unshift(TestHooksMiddleware.name);
   addPlugin(config, { [`middleware:${TestHooksMiddleware.name}`]: ['value', TestHooksMiddleware.instance.handler] });
@@ -99,6 +106,7 @@ export = Object.assign((config: Config) => {
   setDefaultOptions(config);
   setUserKarmaConfigFile(config, log);
   setUserKarmaConfig(config);
+  setBasePath(config);
   setLifeCycleOptions(config);
   setPort(config);
   configureTestHooksMiddleware(config);

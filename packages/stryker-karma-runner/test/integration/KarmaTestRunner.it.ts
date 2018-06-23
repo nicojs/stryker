@@ -44,11 +44,13 @@ describe('KarmaTestRunner', function () {
         port: 9877,
         strykerOptions: {
           logLevel: 'trace',
-          karmaConfig: {
-            files: [
-              'testResources/sampleProject/src/Add.js',
-              'testResources/sampleProject/test/AddSpec.js'
-            ]
+          karma: {
+            config: {
+              files: [
+                'testResources/sampleProject/src/Add.js',
+                'testResources/sampleProject/test/AddSpec.js'
+              ]
+            }
           }
         },
         fileNames: []
@@ -97,12 +99,14 @@ describe('KarmaTestRunner', function () {
         port: 9878,
         strykerOptions: {
           logLevel: 'trace',
-          karmaConfig: {
-            files: [
-              'testResources/sampleProject/src/Add.js',
-              'testResources/sampleProject/test/AddSpec.js',
-              'testResources/sampleProject/test/AddFailedSpec.js'
-            ]
+          karma: {
+            config: {
+              files: [
+                'testResources/sampleProject/src/Add.js',
+                'testResources/sampleProject/test/AddSpec.js',
+                'testResources/sampleProject/test/AddFailedSpec.js'
+              ]
+            }
           }
         },
         fileNames: []
@@ -127,12 +131,14 @@ describe('KarmaTestRunner', function () {
       const testRunnerOptions = {
         port: 9879,
         strykerOptions: {
-          karmaConfig: {
-            files: [
-              'testResources/sampleProject/src/Add.js',
-              'testResources/sampleProject/src/Error.js',
-              'testResources/sampleProject/test/AddSpec.js'
-            ]
+          karma: {
+            config: {
+              files: [
+                'testResources/sampleProject/src/Add.js',
+                'testResources/sampleProject/src/Error.js',
+                'testResources/sampleProject/test/AddSpec.js'
+              ]
+            }
           }
         },
         fileNames: []
@@ -156,11 +162,13 @@ describe('KarmaTestRunner', function () {
       const testRunnerOptions = {
         port: 9880,
         strykerOptions: {
-          karmaConfig: {
-            files: [
-              'testResources/sampleProject/src/Add.js',
-              'testResources/sampleProject/test/EmptySpec.js'
-            ]
+          karma: {
+            config: {
+              files: [
+                'testResources/sampleProject/src/Add.js',
+                'testResources/sampleProject/test/EmptySpec.js'
+              ]
+            }
           }
         },
         fileNames: []
@@ -187,12 +195,14 @@ describe('KarmaTestRunner', function () {
       const testRunnerOptions = {
         port: 9881,
         strykerOptions: {
-          karmaConfig: {
-            files: [
-              { pattern: 'testResources/sampleProject/src/Add.js', mutated: true, included: true },
-              { pattern: 'testResources/sampleProject/test/AddSpec.js', mutated: false, included: true },
-              { pattern: 'testResources/sampleProject/src/Error.js', mutated: false, included: false }
-            ]
+          karma: {
+            config: {
+              files: [
+                { pattern: 'testResources/sampleProject/src/Add.js', mutated: true, included: true },
+                { pattern: 'testResources/sampleProject/test/AddSpec.js', mutated: false, included: true },
+                { pattern: 'testResources/sampleProject/src/Error.js', mutated: false, included: false }
+              ]
+            }
           }
         },
         fileNames: []
@@ -216,11 +226,13 @@ describe('KarmaTestRunner', function () {
         port: 9882,
         strykerOptions: {
           coverageAnalysis: 'all',
-          karmaConfig: {
-            files: [
-              'testResources/sampleProject/src-instrumented/Add.js',
-              'testResources/sampleProject/test/AddSpec.js'
-            ]
+          karma: {
+            config: {
+              files: [
+                'testResources/sampleProject/src-instrumented/Add.js',
+                'testResources/sampleProject/test/AddSpec.js'
+              ]
+            }
           }
         },
         fileNames: []

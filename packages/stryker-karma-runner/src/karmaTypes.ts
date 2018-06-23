@@ -9,4 +9,8 @@ declare module 'karma' {
     detached?: boolean;
     configFile?: string;
   }
+
+  interface Reporter {
+    adapters: any[];
+  }
 }

@@ -1,11 +1,13 @@
-import { RequestHandler } from 'express';
+import * as path from 'path';
 import * as url from 'url';
+import { RequestHandler } from 'express';
 
 export const TEST_HOOKS_FILE_NAME = require.resolve('./testHooksForStryker');
 
 export default class TestHooksMiddleware {
 
   private constructor() {
+    // This `.bind` call is important! The `handler` will be executed with `.apply` (or friends) and otherwise the `this` won't point to this instance!
     this.handler = this.handler.bind(this);
   }
 
@@ -20,8 +22,8 @@ export default class TestHooksMiddleware {
   public currentTestHooks: string = '';
 
   handler: RequestHandler = (request, response, next) => {
-    const path = url.parse(request.url).pathname;
-    if (path && path.endsWith(TEST_HOOKS_FILE_NAME)) {
+    const pathName = url.parse(request.url).pathname;
+    if (pathName && path.normalize(pathName).endsWith(TEST_HOOKS_FILE_NAME)) {
       response.writeHead(200, {
         'Content-Type': 'application/javascript',
         'Cache-Control': 'no-cache'
@@ -32,3 +34,4 @@ export default class TestHooksMiddleware {
     }
   }
 }
+
