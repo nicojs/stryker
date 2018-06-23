@@ -1,73 +1,83 @@
 import * as log4js from 'log4js';
 import { TestRunner, TestResult, RunStatus, RunResult, RunnerOptions, CoverageCollection, CoveragePerTestResult } from 'stryker-api/test_runner';
 import * as karma from 'karma';
-import { KARMA_CONFIG, KARMA_CONFIG_FILE } from './configKeys';
+import StrykerKarmaSetup, { DEPRECATED_KARMA_CONFIG, DEPRECATED_KARMA_CONFIG_FILE, KARMA_CONFIG_KEY, ProjectKind } from './StrykerKarmaSetup';
 import TestHooksMiddleware from './TestHooksMiddleware';
 import { setGlobalLogLevel } from 'log4js';
 import StrykerReporter from './StrykerReporter';
 import strykerKarmaConf = require('./stryker-karma.conf');
-
-let cli = require('@angular/cli/lib/cli');
-if ('default' in cli) {
-  cli = cli.default;
-}
+import ProjectStarter from './starters/ProjectStarter';
 
 export interface ConfigOptions extends karma.ConfigOptions {
-  coverageReporter?: { type: string, dir?: string, subdir?: string };
   detached?: boolean;
 }
 
 export default class KarmaTestRunner implements TestRunner {
-
   private log = log4js.getLogger(KarmaTestRunner.name);
-  // private server: karma.Server;
-  // private serverStartedPromise: Promise<void>;
   private currentTestResults: TestResult[];
   private currentErrorMessages: string[];
   private currentCoverageReport?: CoverageCollection | CoveragePerTestResult;
   private currentRunStatus: RunStatus;
   private readonly testHooksMiddleware = TestHooksMiddleware.instance;
+  private readonly starter: ProjectStarter;
 
   constructor(private options: RunnerOptions) {
     setGlobalLogLevel(options.strykerOptions.logLevel || 'info');
-
-    strykerKarmaConf.setGlobals({
-      port: options.port,
-      karmaConfig: options.strykerOptions[KARMA_CONFIG],
-      karmaConfigFile: options.strykerOptions[KARMA_CONFIG_FILE]
-    });
-
-    this.resetRun()
+    this.starter = new ProjectStarter(this.loadSetup(options).project);
+    this.cleanRun()
     this.listenToRunComplete();
     this.listenToSpecComplete();
     this.listenToCoverage();
-    this.listenToBrowserError();
+    this.listenToError();
   }
 
   init(): Promise<void> {
     return new Promise((res, rej) => {
-      StrykerReporter.instance.on('browsers_ready', res);
-      cli({
-        cliArgs: ['test', `--karma-config=${require.resolve('./stryker-karma.conf')}`],
-        inputStream: process.stdin,
-        outputStream: process.stdout
-      }).then(() => {
-        console.log('cli done');
-      }).catch(rej);
+      StrykerReporter.instance.once('browsers_ready', res);
+      this.starter.start().catch(rej);
     });
   }
 
-  resetRun() {
+  async run({ testHooks }: { testHooks?: string }): Promise<RunResult> {
+    this.testHooksMiddleware.currentTestHooks = testHooks || '';
+    if (this.currentRunStatus !== RunStatus.Error) {
+      // Only run when there was no compile error
+      // An compile error can happen in case of angular-cli
+      await this.runServer();
+    }
+    const runResult = this.collectRunResult();
+    this.cleanRun();
+    return runResult;
+  }
+
+  private loadSetup(settings: RunnerOptions): StrykerKarmaSetup {
+    const defaultKarmaConfig: StrykerKarmaSetup = {
+      project: 'custom'
+    };
+    const strykerKarmaSetup: StrykerKarmaSetup = Object.assign(defaultKarmaConfig, settings.strykerOptions[KARMA_CONFIG_KEY]);
+
+    const loadDeprecatedOption = (configKey: keyof StrykerKarmaSetup, deprecatedConfigOption: string) => {
+      if (!strykerKarmaSetup[configKey] && settings.strykerOptions[deprecatedConfigOption]) {
+        this.log.warn(`[deprecated]: config option ${deprecatedConfigOption} is renamed to ${KARMA_CONFIG_KEY}.${configKey}`);
+        strykerKarmaSetup[configKey] = settings.strykerOptions[deprecatedConfigOption];
+      }
+    }
+
+    loadDeprecatedOption('configFile', DEPRECATED_KARMA_CONFIG_FILE);
+    loadDeprecatedOption('config', DEPRECATED_KARMA_CONFIG);
+    strykerKarmaConf.setGlobals({
+      port: settings.port,
+      karmaConfig: strykerKarmaSetup.config,
+      karmaConfigFile: strykerKarmaSetup.configFile
+    });
+    return strykerKarmaSetup;
+  }
+
+  private cleanRun() {
     this.currentTestResults = [];
     this.currentErrorMessages = [];
     this.currentCoverageReport = undefined;
     this.currentRunStatus = RunStatus.Complete;
-  }
-
-  run({ testHooks }: { testHooks?: string }): Promise<RunResult> {
-    this.testHooksMiddleware.currentTestHooks = testHooks || '';
-    this.resetRun();
-    return this.runServer().then(() => this.collectRunResult());
   }
 
   // Don't use dispose() to stop karma (using karma.stopper.stop)
@@ -91,9 +101,13 @@ export default class KarmaTestRunner implements TestRunner {
     });
   }
 
-  private listenToBrowserError() {
+  private listenToError() {
     StrykerReporter.instance.on('browser_error', (error: string) => {
       this.currentErrorMessages.push(error);
+    });
+    StrykerReporter.instance.on('compile_error', (errors: string[]) => {
+      errors.forEach(error => this.currentErrorMessages.push(error));
+      this.currentRunStatus = RunStatus.Error;
     });
   }
 
@@ -116,10 +130,16 @@ export default class KarmaTestRunner implements TestRunner {
   }
 
   private determineRunState() {
-    if (this.currentRunStatus === RunStatus.Error && !this.currentErrorMessages.length) {
+    // Karma will report an Error if no tests had executed. 
+    // This is not an "error" in Stryker terms
+    if (this.currentRunStatus === RunStatus.Error &&
+      !this.currentErrorMessages.length &&
+      !this.currentTestResults.length) {
       return RunStatus.Complete;
-    }
-    else {
+    } else if (this.currentErrorMessages.length) {
+      // Karma will return Complete when there are runtime errors
+      return RunStatus.Error;
+    } else {
       return this.currentRunStatus;
     }
   }
