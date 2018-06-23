@@ -80,7 +80,7 @@ describe('stryker-karma.conf.js', () => {
   it('should configure the tests hooks middleware', () => {
     sut(config);
     expect(config).deep.include({
-      files: [{ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: true, nocache: true }]
+      files: [{ pattern: TEST_HOOKS_FILE_NAME, included: true, watched: false, served: false, nocache: true }]
     });
     expect(config.plugins).include('karma-*');
     expect(config.plugins).deep.include({ ['middleware:TestHooksMiddleware']: ['value', TestHooksMiddleware.instance.handler] });
