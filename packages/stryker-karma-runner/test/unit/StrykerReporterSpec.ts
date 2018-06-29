@@ -100,7 +100,7 @@ describe('StrykerReporter', () => {
 
   describe('onBrowserComplete', () => {
     it('should emit "coverage_report"', () => {
-      const events = listenTo("coverage_report");
+      const events = listenTo('coverage_report');
       const expectedCoverage = { ['foobar.js']: { s: [] } };
       sut.onBrowserComplete(undefined, { coverage: expectedCoverage });
       expect(events()).lengthOf(1);

@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import { expect } from 'chai';
 import * as log4js from 'log4js';
 import * as karma from 'karma';
-import strykerKarmaConf = require('../../src/stryker-karma.conf');
+import strykerKarmaConf = require('../../src/starters/stryker-karma.conf');
 import ProjectStarter, * as projectStarterModule from '../../src/starters/ProjectStarter';
 import KarmaTestRunner from '../../src/KarmaTestRunner';
 import { RunnerOptions, TestResult, TestStatus, RunStatus } from 'stryker-api/test_runner';

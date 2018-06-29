@@ -1,11 +1,11 @@
 import * as log4js from 'log4js';
 import { TestRunner, TestResult, RunStatus, RunResult, RunnerOptions, CoverageCollection, CoveragePerTestResult } from 'stryker-api/test_runner';
 import * as karma from 'karma';
-import StrykerKarmaSetup, { DEPRECATED_KARMA_CONFIG, DEPRECATED_KARMA_CONFIG_FILE, KARMA_CONFIG_KEY, ProjectKind } from './StrykerKarmaSetup';
+import StrykerKarmaSetup, { DEPRECATED_KARMA_CONFIG, DEPRECATED_KARMA_CONFIG_FILE, KARMA_CONFIG_KEY } from './StrykerKarmaSetup';
 import TestHooksMiddleware from './TestHooksMiddleware';
 import { setGlobalLogLevel } from 'log4js';
 import StrykerReporter from './StrykerReporter';
-import strykerKarmaConf = require('./stryker-karma.conf');
+import strykerKarmaConf = require('./starters/stryker-karma.conf');
 import ProjectStarter from './starters/ProjectStarter';
 
 export interface ConfigOptions extends karma.ConfigOptions {
@@ -24,7 +24,7 @@ export default class KarmaTestRunner implements TestRunner {
   constructor(private options: RunnerOptions) {
     setGlobalLogLevel(options.strykerOptions.logLevel || 'info');
     this.starter = new ProjectStarter(this.loadSetup(options).project);
-    this.cleanRun()
+    this.cleanRun();
     this.listenToRunComplete();
     this.listenToSpecComplete();
     this.listenToCoverage();
@@ -34,7 +34,9 @@ export default class KarmaTestRunner implements TestRunner {
   init(): Promise<void> {
     return new Promise((res, rej) => {
       StrykerReporter.instance.once('browsers_ready', res);
-      this.starter.start().catch(rej);
+      this.starter.start()
+        .then(() => { /*noop*/ })
+        .catch(rej);
     });
   }
 
@@ -61,7 +63,7 @@ export default class KarmaTestRunner implements TestRunner {
         this.log.warn(`[deprecated]: config option ${deprecatedConfigOption} is renamed to ${KARMA_CONFIG_KEY}.${configKey}`);
         strykerKarmaSetup[configKey] = settings.strykerOptions[deprecatedConfigOption];
       }
-    }
+    };
 
     loadDeprecatedOption('configFile', DEPRECATED_KARMA_CONFIG_FILE);
     loadDeprecatedOption('config', DEPRECATED_KARMA_CONFIG);

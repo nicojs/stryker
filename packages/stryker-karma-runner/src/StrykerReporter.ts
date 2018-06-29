@@ -77,12 +77,12 @@ export default class StrykerReporter extends EventEmitter implements karma.Repor
     } else {
       this.emit('browser_error', error.toString());
     }
-  };
+  }
 
   onCompileError(errors: string[]) {
     // This is called from angular cli logic
     // https://github.com/angular/angular-cli/blob/012672161087a05ae5ecffbed5d1ee307ce1e0ad/packages/angular_devkit/build_angular/src/angular-cli-files/plugins/karma.ts#L96
     this.emit('compile_error', errors);
-  };
+  }
 
 }

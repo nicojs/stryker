@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import { expect } from 'chai';
 import { CoverageCollection, RunnerOptions, RunResult, RunStatus, TestStatus } from 'stryker-api/test_runner';
 import KarmaTestRunner from '../../src/KarmaTestRunner';
@@ -14,12 +13,6 @@ function wrapInClosure(codeFragment: string) {
 }
 
 describe('KarmaTestRunner', function () {
-
-  after(() => {
-    try {
-      fs.unlinkSync('__test_hooks_for_stryker__.js');
-    } catch { }
-  });
 
   let sut: KarmaTestRunner;
   this.timeout(10000);

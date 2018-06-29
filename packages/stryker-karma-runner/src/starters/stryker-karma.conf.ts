@@ -1,8 +1,8 @@
 import { Config, ConfigOptions } from 'karma';
 import * as path from 'path';
-import { requireModule } from './utils';
-import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from './TestHooksMiddleware';
-import StrykerReporter from './StrykerReporter';
+import { requireModule } from '../utils';
+import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from '../TestHooksMiddleware';
+import StrykerReporter from '../StrykerReporter';
 import { getLogger, Logger } from 'log4js';
 
 function setDefaultOptions(config: Config) {
@@ -46,7 +46,7 @@ function setLifeCycleOptions(config: Config) {
 function setPort(config: Config) {
   config.set({
     port: globalSettings.port
-  })
+  });
 }
 
 function setUserKarmaConfig(config: Config) {

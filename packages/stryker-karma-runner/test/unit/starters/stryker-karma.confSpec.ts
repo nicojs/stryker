@@ -1,12 +1,12 @@
 import * as path from 'path';
 import * as log4js from 'log4js';
-import sut = require('../../src/stryker-karma.conf');
+import sut = require('../../../src/starters/stryker-karma.conf');
 import { Config, ConfigOptions } from 'karma';
 import { expect } from 'chai';
-import LoggerStub from '../helpers/LoggerStub';
-import * as utils from '../../src/utils';
-import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from '../../src/TestHooksMiddleware';
-import StrykerReporter from '../../src/StrykerReporter';
+import LoggerStub from '../../helpers/LoggerStub';
+import * as utils from '../../../src/utils';
+import TestHooksMiddleware, { TEST_HOOKS_FILE_NAME } from '../../../src/TestHooksMiddleware';
+import StrykerReporter from '../../../src/StrykerReporter';
 
 describe('stryker-karma.conf.js', () => {
 
@@ -36,7 +36,7 @@ describe('stryker-karma.conf.js', () => {
       frameworks: ['jasmine']
     };
     sut(config);
-    expect(config).deep.include(expected)
+    expect(config).deep.include(expected);
   });
 
   it('should set user configuration from a custom karma.conf.js file', () => {

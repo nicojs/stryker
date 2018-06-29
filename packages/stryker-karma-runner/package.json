@@ -36,7 +36,7 @@
   "devDependencies": {
     "@types/semver": "^5.5.0",
     "jasmine-core": "^2.4.1",
-    "karma": "^2.0.0",
+    "karma": "^2.0.4",
     "karma-jasmine": "^1.1.2",
     "karma-phantomjs-launcher": "^1.0.4",
     "stryker-api": "^0.17.2",
