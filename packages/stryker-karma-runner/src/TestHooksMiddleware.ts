@@ -23,6 +23,7 @@ export default class TestHooksMiddleware {
 
   handler: RequestHandler = (request, response, next) => {
     const pathName = url.parse(request.url).pathname;
+    console.log(`TMPDEBUG pathName: ${pathName}, testhooksfile: ${TEST_HOOKS_FILE_NAME}, normalized: ${pathName}`);
     if (pathName && path.normalize(pathName).endsWith(TEST_HOOKS_FILE_NAME)) {
       response.writeHead(200, {
         'Content-Type': 'application/javascript',
