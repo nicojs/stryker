@@ -53,6 +53,10 @@
     "Philipp Weissenbacher <philipp.weissenbacher@gmail.com>"
   ],
   "initStrykerConfig": {
-    "karmaConfigFile": "karma.conf.js"
+    "karma": {
+      "project": "custom",
+      "configFile": "karma.conf.js",
+      "config": {}
+    }      
   }
 }
