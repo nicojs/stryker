@@ -13,15 +13,15 @@ Promise.all(dirs.map(runTest)).catch(() => {
 function execNpm(command: string, testDir: string) {
   const currentTestDir = path.resolve(testRootDir, testDir);
   console.log(`Exec ${testDir} npm ${command}`);
-  const testProcess = execa('npm', [command], { timeout: 500000, cwd: currentTestDir, stdio: 'pipe' });
-  let stderr = '';
-  let stdout = '';
-  testProcess.stderr.on('data', chunk => stderr += chunk.toString());
-  testProcess.stdout.on('data', chunk => stdout += chunk.toString());
+  const testProcess = execa('npm', [command], { timeout: 500000, cwd: currentTestDir, stdio: 'inherit' });
+  // let stderr = '';
+  // let stdout = '';
+  // testProcess.stderr.on('data', chunk => stderr += chunk.toString());
+  // testProcess.stdout.on('data', chunk => stdout += chunk.toString());
   return testProcess.catch(error => {
     console.log(`X ${testDir}`);
-    console.log(stdout);
-    console.error(stderr);
+    // console.log(stdout);
+    // console.error(stderr);
     throw error;
   });
 }
